@@ -33,10 +33,14 @@ Azure **Content Understanding** 및 **Document Intelligence** 서비스를 **Azu
 
 ## 설치
 
+[uv](https://docs.astral.sh/uv/)를 사용하여 패키지를 관리합니다.
+
 ```bash
 cd app
-pip install -r requirements.txt
+uv sync          # 가상환경 생성 + 의존성 설치
 ```
+
+> `uv`가 없는 경우: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ## 환경 변수 설정
 
@@ -54,13 +58,13 @@ cp .env.example .env
 
 ```bash
 # 전체 실행
-python main.py
+uv run python main.py
 
 # Content Understanding만
-python main.py content-understanding
+uv run python main.py content-understanding
 
 # Document Intelligence만
-python main.py document-intelligence
+uv run python main.py document-intelligence
 ```
 
 ## 샘플 파일
