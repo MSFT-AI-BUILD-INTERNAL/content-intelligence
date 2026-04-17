@@ -1,26 +1,26 @@
 """
 Content Understanding sample — analyze a receipt via Azure AI Foundry.
 
-Analyzes sample_files/trip-receipt.pdf using prebuilt analyzers.
+Analyzes sample_files/trip-receipt.pdf using prebuilt analyzers,
+then refines the output into structured JSON via LLM.
 Authentication: Azure Managed Identity (DefaultAzureCredential).
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import cast
 
 from azure.ai.contentunderstanding import ContentUnderstandingClient
 from azure.ai.contentunderstanding.models import (
     AnalysisResult,
-    ArrayField,
     DocumentContent,
-    ObjectField,
 )
 
 from auth import get_credential
 from config import FOUNDRY_ENDPOINT
+from llm import extract_structured, pretty_print
+from models import DocumentSummary, ReceiptSummary
 
 SAMPLE_FILE = Path(__file__).parent / "sample_files" / "trip-receipt.pdf"
 
@@ -32,8 +32,8 @@ def _build_client() -> ContentUnderstandingClient:
     )
 
 
-def analyze_document(file_path: Path) -> AnalysisResult:
-    """Extract document content with prebuilt-documentSearch."""
+def analyze_document(file_path: Path) -> str:
+    """Extract document content with prebuilt-documentSearch. Returns markdown."""
     client = _build_client()
 
     print(f"[Content Understanding] Analyzing: {file_path.name}")
@@ -43,17 +43,16 @@ def analyze_document(file_path: Path) -> AnalysisResult:
     )
     result: AnalysisResult = poller.result()
 
+    markdown_parts: list[str] = []
     for content in result.contents:
         if isinstance(content, DocumentContent):
-            print(f"  Pages: {content.start_page_number} – {content.end_page_number}")
-            print(f"  Markdown preview (first 500 chars):\n{content.markdown[:500]}")
-            if content.tables:
-                print(f"  Tables found: {len(content.tables)}")
-    return result
+            markdown_parts.append(content.markdown)
+
+    return "\n".join(markdown_parts)
 
 
-def analyze_receipt(file_path: Path) -> AnalysisResult:
-    """Extract structured receipt fields with prebuilt-receipt."""
+def analyze_receipt(file_path: Path) -> str:
+    """Extract receipt content with prebuilt-receipt. Returns raw text."""
     client = _build_client()
 
     print(f"[Content Understanding] Analyzing receipt: {file_path.name}")
@@ -63,39 +62,15 @@ def analyze_receipt(file_path: Path) -> AnalysisResult:
     )
     result: AnalysisResult = poller.result()
 
-    if not result.contents:
-        print("  No content returned.")
-        return result
+    parts: list[str] = []
+    for content in result.contents:
+        if isinstance(content, DocumentContent):
+            parts.append(content.markdown)
+            if content.fields:
+                for name, field in content.fields.items():
+                    parts.append(f"{name}: {field.value} (confidence: {field.confidence})")
 
-    doc = cast(DocumentContent, result.contents[0])
-    if not doc.fields:
-        print("  No fields extracted.")
-        return result
-
-    for field_name in ("MerchantName", "MerchantAddress", "TransactionDate"):
-        field = doc.fields.get(field_name)
-        if field:
-            confidence = f" (confidence: {field.confidence:.2f})" if field.confidence else ""
-            print(f"  {field_name}: {field.value}{confidence}")
-
-    total = doc.fields.get("Total")
-    if isinstance(total, ObjectField) and total.value:
-        amount = total.value.get("Amount")
-        currency = total.value.get("CurrencyCode")
-        amt_str = f"{amount.value}" if amount else "N/A"
-        cur_str = currency.value if currency and currency.value else ""
-        print(f"  Total: {cur_str}{amt_str}")
-
-    items = doc.fields.get("Items")
-    if isinstance(items, ArrayField) and items.value:
-        print(f"  Items ({len(items.value)}):")
-        for i, item in enumerate(items.value, 1):
-            if isinstance(item, ObjectField) and item.value:
-                desc = item.value.get("Description")
-                qty = item.value.get("Quantity")
-                print(f"    [{i}] {desc.value if desc else 'N/A'}  x{qty.value if qty else '?'}")
-
-    return result
+    return "\n".join(parts)
 
 
 def main() -> None:
@@ -107,11 +82,29 @@ def main() -> None:
         print(f"\n[ERROR] File not found: {SAMPLE_FILE}")
         return
 
-    print("\n--- 1. Document Analysis ---")
-    analyze_document(SAMPLE_FILE)
+    # 1. Document analysis → structured summary via LLM
+    print("\n--- 1. Document Analysis (structured) ---")
+    markdown = analyze_document(SAMPLE_FILE)
+    print("  Raw markdown extracted. Sending to LLM for structuring...")
 
-    print("\n--- 2. Receipt Field Extraction ---")
-    analyze_receipt(SAMPLE_FILE)
+    doc_summary = extract_structured(
+        markdown,
+        DocumentSummary,
+        instruction="Summarize this document. Extract title, language, key phrases, and a brief summary.",
+    )
+    print(pretty_print(doc_summary))
+
+    # 2. Receipt analysis → structured receipt via LLM
+    print("\n--- 2. Receipt Field Extraction (structured) ---")
+    receipt_text = analyze_receipt(SAMPLE_FILE)
+    print("  Raw receipt data extracted. Sending to LLM for structuring...")
+
+    receipt = extract_structured(
+        receipt_text,
+        ReceiptSummary,
+        instruction="Extract structured receipt information including merchant, items, and totals.",
+    )
+    print(pretty_print(receipt))
 
 
 if __name__ == "__main__":

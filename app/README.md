@@ -52,6 +52,7 @@ cp .env.example .env
 | 변수 | 설명 | 기본값 |
 |------|------|--------|
 | `FOUNDRY_ENDPOINT` | AI Foundry 프로젝트 엔드포인트 | `https://jinsungpark-westus-resource.services.ai.azure.com/api/projects/jinsungpark-westus` |
+| `LLM_DEPLOYMENT` | LLM 배포 이름 (구조화 출력용) | `gpt-4o` |
 | `DOCUMENT_INTELLIGENCE_ENDPOINT` | Document Intelligence 엔드포인트 | `https://jinsungpark-westus-resource.cognitiveservices.azure.com/` |
 
 ## 실행
@@ -74,13 +75,17 @@ uv run python main.py document-intelligence
 ## 주요 기능
 
 ### Content Understanding (`content_understanding_sample.py`)
-- **문서 분석** — `begin_analyze_binary()` (prebuilt-documentSearch)
-- **영수증 필드 추출** — `begin_analyze_binary()` (prebuilt-receipt)
+- **문서 분석** — `prebuilt-documentSearch` → LLM으로 `DocumentSummary` JSON 출력
+- **영수증 필드 추출** — `prebuilt-receipt` → LLM으로 `ReceiptSummary` JSON 출력
 
 ### Document Intelligence (`document_intelligence_sample.py`)
-- **레이아웃 분석** — 테이블, 단락, 선택 마크 추출 (prebuilt-layout)
-- **영수증 분석** — 구조화된 필드 추출 (prebuilt-receipt)
-- **텍스트 OCR** — 텍스트 및 언어 감지 (prebuilt-read)
+- **레이아웃 + OCR 분석** — `prebuilt-layout` + `prebuilt-read` → LLM으로 `DocumentSummary` JSON 출력
+- **영수증 분석** — `prebuilt-receipt` → LLM으로 `ReceiptSummary` JSON 출력
+
+### 구조화 출력 (`models.py`, `llm.py`)
+- Pydantic 모델 기반 (`ReceiptSummary`, `DocumentSummary`)
+- Foundry 프로젝트의 LLM (gpt-4o)을 통해 원본 텍스트를 구조화된 JSON으로 정제
+- `JsonSchemaFormat`을 사용한 Structured Output 보장
 
 ## 인증 방식
 
