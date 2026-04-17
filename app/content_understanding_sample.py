@@ -18,7 +18,7 @@ from azure.ai.contentunderstanding.models import (
 )
 
 from auth import get_credential
-from config import FOUNDRY_ENDPOINT
+from config import CONTENT_UNDERSTANDING_ENDPOINT
 from llm import extract_structured, pretty_print
 from models import DocumentSummary, ReceiptSummary
 
@@ -27,8 +27,9 @@ SAMPLE_FILE = Path(__file__).parent / "sample_files" / "trip-receipt.pdf"
 
 def _build_client() -> ContentUnderstandingClient:
     return ContentUnderstandingClient(
-        endpoint=FOUNDRY_ENDPOINT,
+        endpoint=CONTENT_UNDERSTANDING_ENDPOINT,
         credential=get_credential(),
+        credential_scopes=["https://ai.azure.com/.default"],
     )
 
 
