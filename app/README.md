@@ -69,24 +69,18 @@ uv run python main.py document-intelligence
 
 ## 샘플 파일
 
-`sample_files/` 디렉터리에 PDF 파일을 넣으면 로컬 파일 분석이 실행됩니다:
-
-```bash
-cp your_document.pdf app/sample_files/sample.pdf
-```
+`sample_files/trip-receipt.pdf`를 분석 대상으로 사용합니다.
 
 ## 주요 기능
 
 ### Content Understanding (`content_understanding_sample.py`)
-- **로컬 PDF 분석** — `begin_analyze_binary()` (prebuilt-documentSearch)
-- **URL 문서 분석** — `begin_analyze()` (prebuilt-documentSearch)
-- **인보이스 필드 추출** — `begin_analyze()` (prebuilt-invoice)
+- **문서 분석** — `begin_analyze_binary()` (prebuilt-documentSearch)
+- **영수증 필드 추출** — `begin_analyze_binary()` (prebuilt-receipt)
 
 ### Document Intelligence (`document_intelligence_sample.py`)
 - **레이아웃 분석** — 테이블, 단락, 선택 마크 추출 (prebuilt-layout)
-- **인보이스 분석** — 구조화된 필드 추출 (prebuilt-invoice)
+- **영수증 분석** — 구조화된 필드 추출 (prebuilt-receipt)
 - **텍스트 OCR** — 텍스트 및 언어 감지 (prebuilt-read)
-- **URL 문서 분석** — 원격 문서 레이아웃 분석
 
 ## 인증 방식
 

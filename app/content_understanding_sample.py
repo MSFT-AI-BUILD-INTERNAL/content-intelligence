@@ -1,22 +1,18 @@
 """
-Content Understanding sample — analyze documents & images via Azure AI Foundry.
+Content Understanding sample — analyze a receipt via Azure AI Foundry.
 
-Demonstrates:
-  1. Analyze a local PDF file (binary upload)
-  2. Analyze a document from a public URL
-  3. Analyze an invoice and extract structured fields
-
-All authentication goes through Azure Managed Identity (DefaultAzureCredential).
+Analyzes sample_files/trip-receipt.pdf using prebuilt analyzers.
+Authentication: Azure Managed Identity (DefaultAzureCredential).
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import cast
 
 from azure.ai.contentunderstanding import ContentUnderstandingClient
 from azure.ai.contentunderstanding.models import (
-    AnalysisInput,
     AnalysisResult,
     ArrayField,
     DocumentContent,
@@ -26,6 +22,8 @@ from azure.ai.contentunderstanding.models import (
 from auth import get_credential
 from config import FOUNDRY_ENDPOINT
 
+SAMPLE_FILE = Path(__file__).parent / "sample_files" / "trip-receipt.pdf"
+
 
 def _build_client() -> ContentUnderstandingClient:
     return ContentUnderstandingClient(
@@ -34,20 +32,14 @@ def _build_client() -> ContentUnderstandingClient:
     )
 
 
-# ------------------------------------------------------------------
-# 1. Analyze a local PDF (binary)
-# ------------------------------------------------------------------
-def analyze_local_document(file_path: str) -> AnalysisResult:
-    """Upload a local document and extract content with prebuilt-documentSearch."""
+def analyze_document(file_path: Path) -> AnalysisResult:
+    """Extract document content with prebuilt-documentSearch."""
     client = _build_client()
 
-    with open(file_path, "rb") as f:
-        file_bytes = f.read()
-
-    print(f"[Content Understanding] Analyzing local file: {file_path}")
+    print(f"[Content Understanding] Analyzing: {file_path.name}")
     poller = client.begin_analyze_binary(
         analyzer_id="prebuilt-documentSearch",
-        binary_input=file_bytes,
+        binary_input=file_path.read_bytes(),
     )
     result: AnalysisResult = poller.result()
 
@@ -60,38 +52,14 @@ def analyze_local_document(file_path: str) -> AnalysisResult:
     return result
 
 
-# ------------------------------------------------------------------
-# 2. Analyze a document from URL
-# ------------------------------------------------------------------
-def analyze_document_from_url(url: str) -> AnalysisResult:
-    """Analyze a remote document using prebuilt-documentSearch."""
+def analyze_receipt(file_path: Path) -> AnalysisResult:
+    """Extract structured receipt fields with prebuilt-receipt."""
     client = _build_client()
 
-    print(f"[Content Understanding] Analyzing URL: {url}")
-    poller = client.begin_analyze(
-        analyzer_id="prebuilt-documentSearch",
-        inputs=[AnalysisInput(url=url)],
-    )
-    result: AnalysisResult = poller.result()
-
-    for content in result.contents:
-        if isinstance(content, DocumentContent):
-            print(f"  Pages: {content.start_page_number} – {content.end_page_number}")
-            print(f"  Markdown preview (first 500 chars):\n{content.markdown[:500]}")
-    return result
-
-
-# ------------------------------------------------------------------
-# 3. Analyze an invoice and extract structured fields
-# ------------------------------------------------------------------
-def analyze_invoice(url: str) -> AnalysisResult:
-    """Analyze an invoice and extract structured fields (prebuilt-invoice)."""
-    client = _build_client()
-
-    print(f"[Content Understanding] Analyzing invoice: {url}")
-    poller = client.begin_analyze(
-        analyzer_id="prebuilt-invoice",
-        inputs=[AnalysisInput(url=url)],
+    print(f"[Content Understanding] Analyzing receipt: {file_path.name}")
+    poller = client.begin_analyze_binary(
+        analyzer_id="prebuilt-receipt",
+        binary_input=file_path.read_bytes(),
     )
     result: AnalysisResult = poller.result()
 
@@ -104,26 +72,23 @@ def analyze_invoice(url: str) -> AnalysisResult:
         print("  No fields extracted.")
         return result
 
-    # Print key invoice fields
-    for field_name in ("CustomerName", "VendorName", "InvoiceDate", "InvoiceId"):
+    for field_name in ("MerchantName", "MerchantAddress", "TransactionDate"):
         field = doc.fields.get(field_name)
         if field:
             confidence = f" (confidence: {field.confidence:.2f})" if field.confidence else ""
             print(f"  {field_name}: {field.value}{confidence}")
 
-    # Total amount (nested object)
-    total = doc.fields.get("TotalAmount")
+    total = doc.fields.get("Total")
     if isinstance(total, ObjectField) and total.value:
         amount = total.value.get("Amount")
         currency = total.value.get("CurrencyCode")
         amt_str = f"{amount.value}" if amount else "N/A"
         cur_str = currency.value if currency and currency.value else ""
-        print(f"  TotalAmount: {cur_str}{amt_str}")
+        print(f"  Total: {cur_str}{amt_str}")
 
-    # Line items (array)
-    items = doc.fields.get("LineItems")
+    items = doc.fields.get("Items")
     if isinstance(items, ArrayField) and items.value:
-        print(f"  LineItems ({len(items.value)}):")
+        print(f"  Items ({len(items.value)}):")
         for i, item in enumerate(items.value, 1):
             if isinstance(item, ObjectField) and item.value:
                 desc = item.value.get("Description")
@@ -133,35 +98,20 @@ def analyze_invoice(url: str) -> AnalysisResult:
     return result
 
 
-# ------------------------------------------------------------------
-# CLI entry
-# ------------------------------------------------------------------
 def main() -> None:
-    sample_url = (
-        "https://raw.githubusercontent.com/Azure-Samples/"
-        "azure-ai-content-understanding-assets/main/document/invoice.pdf"
-    )
-
     print("=" * 60)
-    print("  Content Understanding — Sample Runner")
+    print("  Content Understanding — trip-receipt.pdf")
     print("=" * 60)
 
-    # Local file analysis (if a sample file exists)
-    local_pdf = os.path.join(os.path.dirname(__file__), "sample_files", "sample.pdf")
-    if os.path.exists(local_pdf):
-        print("\n--- 1. Local Document Analysis ---")
-        analyze_local_document(local_pdf)
-    else:
-        print(f"\n[SKIP] Local file not found: {local_pdf}")
-        print("  Place a PDF in app/sample_files/sample.pdf to test local analysis.")
+    if not SAMPLE_FILE.exists():
+        print(f"\n[ERROR] File not found: {SAMPLE_FILE}")
+        return
 
-    # URL-based analysis
-    print("\n--- 2. URL Document Analysis ---")
-    analyze_document_from_url(sample_url)
+    print("\n--- 1. Document Analysis ---")
+    analyze_document(SAMPLE_FILE)
 
-    # Invoice analysis
-    print("\n--- 3. Invoice Field Extraction ---")
-    analyze_invoice(sample_url)
+    print("\n--- 2. Receipt Field Extraction ---")
+    analyze_receipt(SAMPLE_FILE)
 
 
 if __name__ == "__main__":
