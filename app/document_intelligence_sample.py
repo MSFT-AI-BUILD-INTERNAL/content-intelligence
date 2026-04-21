@@ -8,14 +8,16 @@ Authentication: Azure Managed Identity (DefaultAzureCredential).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 
 from auth import get_credential
 from config import DOCUMENT_INTELLIGENCE_ENDPOINT
-from llm import extract_structured, pretty_print
-from models import DocumentSummary, ReceiptSummary
+from llm import extract_raw, extract_structured, pretty_print
+from models import DocumentSummary
+from prompts import get_instruction
 
 SAMPLE_FILE = Path(__file__).parent / "sample_files" / "trip-receipt.pdf"
 
@@ -50,8 +52,45 @@ def analyze_layout(file_path: Path) -> str:
     return "\n".join(lines)
 
 
+def _serialize_field(field, indent: int = 0) -> str:
+    """Recursively serialize a Document Intelligence field to readable text."""
+    prefix = "  " * indent
+    field_type = field.get("type", "")
+
+    # Array field (e.g. Items)
+    if field_type == "array" and "valueArray" in field:
+        parts: list[str] = []
+        for i, item in enumerate(field["valueArray"], 1):
+            parts.append(f"{prefix}[{i}]")
+            parts.append(_serialize_field(item, indent + 1))
+        return "\n".join(parts)
+
+    # Object field (e.g. each Item in Items)
+    if field_type == "object" and "valueObject" in field:
+        parts = []
+        for key, sub_field in field["valueObject"].items():
+            parts.append(f"{prefix}{key}: {_serialize_field(sub_field, indent)}")
+        return "\n".join(parts)
+
+    # Scalar fields — try various value types
+    for value_key in ("valueString", "valueNumber", "valueInteger",
+                      "valueDate", "valueTime", "valueCurrencyAmount",
+                      "valuePhoneNumber", "valueCountryRegion"):
+        val = field.get(value_key)
+        if val is not None:
+            # Currency has amount + currencyCode
+            if value_key == "valueCurrencyAmount" and isinstance(val, dict):
+                amount = val.get("amount", "")
+                code = val.get("currencyCode", "")
+                return f"{code} {amount}" if code else str(amount)
+            return str(val)
+
+    # Fallback to content
+    return field.get("content", "")
+
+
 def analyze_receipt(file_path: Path) -> str:
-    """Extract receipt fields and return as text."""
+    """Extract receipt fields and return as text with full nested detail."""
     client = _build_client()
 
     with open(file_path, "rb") as f:
@@ -62,11 +101,15 @@ def analyze_receipt(file_path: Path) -> str:
     if result.documents:
         for doc in result.documents:
             lines.append(f"Doc type: {doc.doc_type}")
+            confidence = getattr(doc, "confidence", None)
+            if confidence is not None:
+                lines.append(f"Confidence: {confidence}")
             if doc.fields:
                 for name, field in doc.fields.items():
-                    value = field.get("valueString") or field.get("content", "")
-                    confidence = field.get("confidence", "N/A")
-                    lines.append(f"{name}: {value} (confidence: {confidence})")
+                    serialized = _serialize_field(field)
+                    field_conf = field.get("confidence", "")
+                    conf_str = f" (confidence: {field_conf})" if field_conf else ""
+                    lines.append(f"{name}: {serialized}{conf_str}")
 
     return "\n".join(lines)
 
@@ -104,7 +147,7 @@ def main() -> None:
     doc_summary = extract_structured(
         combined,
         DocumentSummary,
-        instruction="Summarize this document. Extract title, language, key phrases, and a brief summary.",
+        instruction=get_instruction("document_summary"),
     )
     print(pretty_print(doc_summary))
 
@@ -114,12 +157,11 @@ def main() -> None:
     receipt_text = analyze_receipt(SAMPLE_FILE)
     print("  Raw receipt data extracted. Sending to LLM for structuring...")
 
-    receipt = extract_structured(
+    receipt = extract_raw(
         receipt_text,
-        ReceiptSummary,
-        instruction="Extract structured receipt information including merchant, items, and totals.",
+        instruction=get_instruction("receipt_extraction"),
     )
-    print(pretty_print(receipt))
+    print(json.dumps(receipt, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from openai import AzureOpenAI
 from pydantic import BaseModel
 
 from config import AZURE_OPENAI_ENDPOINT, LLM_DEPLOYMENT
+from prompts import get_system_template
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -60,20 +61,15 @@ def extract_structured(
 
     schema = _make_strict_schema(model_class.model_json_schema())
 
+    system_content = get_system_template().format(
+        instruction=instruction,
+        schema=json.dumps(schema, indent=2),
+    )
+
     response = client.chat.completions.create(
         model=LLM_DEPLOYMENT,
         messages=[
-            {
-                "role": "system",
-                "content": (
-                    f"{instruction}\n\n"
-                    f"Respond with a JSON object that conforms to this schema:\n"
-                    f"{json.dumps(schema, indent=2)}\n\n"
-                    "All date values MUST use YYYY-MM-dd format (e.g. 2026-01-05).\n"
-                    "All text values MUST be in Korean (한국어).\n"
-                    "Return ONLY the JSON object, no explanation."
-                ),
-            },
+            {"role": "system", "content": system_content},
             {"role": "user", "content": raw_text},
         ],
         response_format={
@@ -94,3 +90,27 @@ def extract_structured(
 def pretty_print(obj: BaseModel) -> str:
     """Return a nicely formatted string of the Pydantic model."""
     return json.dumps(obj.model_dump(exclude_none=True), indent=2, ensure_ascii=False)
+
+
+def extract_raw(raw_text: str, instruction: str) -> dict:
+    """Send raw text to the LLM and return a free-form JSON dict (no schema constraint)."""
+    client = _build_client()
+
+    system_content = (
+        f"{instruction}\n\n"
+        "All date values MUST use YYYY-MM-dd format (e.g. 2026-01-05).\n"
+        "All text values MUST be in Korean (한국어).\n"
+        "Return ONLY a JSON object, no explanation."
+    )
+
+    response = client.chat.completions.create(
+        model=LLM_DEPLOYMENT,
+        messages=[
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": raw_text},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.0,
+    )
+
+    return json.loads(response.choices[0].message.content)

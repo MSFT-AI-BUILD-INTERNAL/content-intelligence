@@ -1,0 +1,45 @@
+# Prompts for LLM structured output extraction.
+# Referenced by the app via prompts.load() helper.
+
+# --- System prompt template (used in llm.py) ---
+system_template: |
+  {instruction}
+
+  Respond with a JSON object that conforms to this schema:
+  {schema}
+
+  All date values MUST use YYYY-MM-dd format (e.g. 2026-01-05).
+  All text values MUST be in Korean (한국어).
+  Return ONLY the JSON object, no explanation.
+
+# --- Task-specific instructions ---
+instructions:
+  document_summary: >
+    Summarize this document. Extract title, language, key phrases, and a brief summary.
+
+  receipt_extraction: >
+    You are given the full output of Azure Document Intelligence analysis (layout, OCR text, and extracted receipt fields).
+    Analyze ALL the data and extract a comprehensive, detailed JSON object.
+
+    First, determine the receipt type and include it as "receipt_type" (one of: restaurant, hotel, transportation, general).
+
+    Extract EVERY piece of information available in the document. Do NOT omit details.
+    Include all common fields: merchant_name, merchant_address, transaction_date, currency, subtotal, tax, tip, total, payment_method.
+
+    IMPORTANT: For 'transaction_date', use the 'Purchase date' (the date the payment was made),
+    NOT the check-in date, check-out date, or service date.
+
+    For line items / charges, ALWAYS include an "items" array with ALL individual charges found in the document.
+    Each item should have: description, amount, and any other relevant detail (date, quantity, unit_price, etc.).
+    Include room charges per night, taxes, fees, surcharges, insurance, discounts — everything.
+
+    For hotel receipts, also include: hotel_name, guest_name, confirmation_number,
+    check_in, check_out, nights, room_type.
+
+    For restaurant receipts, also include: table_number, server_name, guests, service_charge.
+
+    For transportation receipts, also include: transport_type, booking_reference, passenger_name,
+    departure, arrival, departure_time, arrival_time, distance, duration.
+
+    Be thorough. If the document contains savings, discounts, or notes, include them.
+    Omit only fields that are truly absent from the document. Do not invent data.

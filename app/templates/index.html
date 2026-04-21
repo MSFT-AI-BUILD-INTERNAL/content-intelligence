@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Intelligence</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #0078d4, #005a9e);
+            color: white;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+
+        header svg { width: 28px; height: 28px; fill: white; }
+        header h1 { font-size: 18px; font-weight: 600; }
+        header span { font-size: 13px; opacity: 0.8; margin-left: 8px; }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- Left Panel: File List --- */
+        .sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 16px 20px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 14px;
+        }
+
+        .file-item:hover { background: #f0f6ff; }
+        .file-item.active { background: #e3f0ff; color: #0078d4; font-weight: 600; }
+
+        .file-icon {
+            width: 32px; height: 32px;
+            background: #fff3e0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .file-item.active .file-icon { background: #e3f0ff; }
+
+        /* --- Right Panel --- */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            font-size: 16px;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .placeholder svg { width: 64px; height: 64px; fill: #ddd; }
+
+        .result-panels {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            display: none;
+        }
+
+        .result-panels.visible {
+            display: flex;
+        }
+
+        /* Top: JSON panel */
+        .json-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 2px solid #e0e0e0;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 10px 20px;
+            background: #fafafa;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .panel-header .badge {
+            background: #0078d4;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .json-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px 20px;
+            background: #1e1e2e;
+        }
+
+        .json-content pre {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #cdd6f4;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* JSON syntax highlighting */
+        .json-key { color: #89b4fa; }
+        .json-string { color: #a6e3a1; }
+        .json-number { color: #fab387; }
+        .json-boolean { color: #cba6f7; }
+        .json-null { color: #f38ba8; }
+
+        /* Bottom: LLM panel */
+        .llm-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .llm-content {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            background: white;
+        }
+
+        .summary-section {
+            margin-bottom: 24px;
+        }
+
+        .summary-section h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #0078d4;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 8px 16px;
+            font-size: 14px;
+        }
+
+        .summary-grid .label {
+            color: #888;
+            font-weight: 500;
+        }
+
+        .summary-grid .value {
+            color: #333;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag {
+            background: #e8f4fd;
+            color: #0078d4;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .item-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .item-table th {
+            background: #f7f7f7;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #eee;
+        }
+
+        .item-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .item-table tr:hover td { background: #fafafa; }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 100;
+        }
+
+        .loading-overlay.hidden { display: none; }
+
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #0078d4;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .loading-steps {
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            background: #fafafa;
+            border-bottom: 1px solid #eee;
+            flex-shrink: 0;
+        }
+
+        .tab {
+            padding: 8px 20px;
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: #888;
+            transition: all 0.15s;
+        }
+
+        .tab:hover { color: #333; }
+        .tab.active { color: #0078d4; border-bottom-color: #0078d4; font-weight: 600; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .main-content { position: relative; }
+    </style>
+</head>
+<body>
+
+<header>
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/><path d="M8 12h8v2H8zm0 4h5v2H8z"/></svg>
+    <h1>Content Intelligence</h1>
+    <span>Azure Document Intelligence + LLM Analysis</span>
+</header>
+
+<div class="container">
+    <!-- Left: File List -->
+    <div class="sidebar">
+        <div class="sidebar-header">📁 Sample Files</div>
+        <div class="file-list" id="fileList">
+            <div style="padding: 20px; color: #aaa; font-size: 13px;">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Right: Results -->
+    <div class="main-content">
+        <div class="loading-overlay hidden" id="loadingOverlay">
+            <div class="spinner"></div>
+            <div class="loading-text">분석 중...</div>
+            <div class="loading-steps">
+                Document Intelligence로 문서 분석 중<br>
+                LLM으로 구조화된 데이터 추출 중
+            </div>
+        </div>
+
+        <div class="placeholder" id="placeholder">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+            <div>왼쪽에서 파일을 선택하세요</div>
+        </div>
+
+        <div class="result-panels" id="resultPanels">
+            <!-- Top: JSON -->
+            <div class="json-panel">
+                <div class="panel-header">
+                    <span>📄 Document Intelligence 결과</span>
+                    <span class="badge">JSON</span>
+                </div>
+                <div class="tab-bar">
+                    <div class="tab active" data-tab="layout">Layout</div>
+                    <div class="tab" data-tab="ocr">OCR Content</div>
+                    <div class="tab" data-tab="receipt">Receipt Fields</div>
+                    <div class="tab" data-tab="raw">Raw JSON</div>
+                </div>
+                <div class="json-content" id="jsonContent">
+                    <pre id="jsonPre"></pre>
+                </div>
+            </div>
+
+            <!-- Bottom: LLM -->
+            <div class="llm-panel">
+                <div class="panel-header">
+                    <span>🤖 LLM 분석 결과</span>
+                    <span class="badge">GPT-4.1-mini</span>
+                </div>
+                <div class="llm-content" id="llmContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentData = null;
+
+    // --- Load file list ---
+    async function loadFiles() {
+        const res = await fetch('/api/files');
+        const data = await res.json();
+        const list = document.getElementById('fileList');
+        if (data.files.length === 0) {
+            list.innerHTML = '<div style="padding:20px;color:#aaa;font-size:13px;">파일 없음</div>';
+            return;
+        }
+        list.innerHTML = data.files.map(f => `
+            <div class="file-item" data-file="${escapeHtml(f)}" onclick="selectFile(this, '${escapeHtml(f)}')">
+                <div class="file-icon">${getFileIcon(f)}</div>
+                <div>${escapeHtml(f)}</div>
+            </div>
+        `).join('');
+    }
+
+    function getFileIcon(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        const icons = { pdf: '📕', png: '🖼️', jpg: '🖼️', jpeg: '🖼️', docx: '📘', xlsx: '📗', txt: '📄' };
+        return icons[ext] || '📄';
+    }
+
+    function escapeHtml(text) {
+        const d = document.createElement('div');
+        d.textContent = text;
+        return d.innerHTML;
+    }
+
+    // --- Select & analyze file ---
+    async function selectFile(el, filename) {
+        document.querySelectorAll('.file-item').forEach(e => e.classList.remove('active'));
+        el.classList.add('active');
+
+        document.getElementById('placeholder').style.display = 'none';
+        document.getElementById('resultPanels').classList.remove('visible');
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+
+        try {
+            const res = await fetch(`/api/analyze/${encodeURIComponent(filename)}`, { method: 'POST' });
+            if (!res.ok) throw new Error(`Error: ${res.status}`);
+            currentData = await res.json();
+
+            renderJson('layout');
+            renderLlm(currentData.llm_analysis);
+
+            document.getElementById('resultPanels').classList.add('visible');
+        } catch (err) {
+            alert('분석 중 오류가 발생했습니다: ' + err.message);
+            document.getElementById('placeholder').style.display = '';
+        } finally {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+    }
+
+    // --- JSON Tabs ---
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            renderJson(tab.dataset.tab);
+        });
+    });
+
+    function renderJson(tab) {
+        if (!currentData) return;
+        const pre = document.getElementById('jsonPre');
+        let text = '';
+
+        if (tab === 'layout') {
+            text = currentData.document_intelligence.layout;
+        } else if (tab === 'ocr') {
+            text = currentData.document_intelligence.ocr_content;
+        } else if (tab === 'receipt') {
+            text = currentData.document_intelligence.receipt_fields;
+        } else if (tab === 'raw') {
+            text = JSON.stringify(currentData.document_intelligence, null, 2);
+        }
+
+        if (tab === 'raw') {
+            pre.innerHTML = syntaxHighlight(text);
+        } else {
+            pre.textContent = text;
+        }
+    }
+
+    function syntaxHighlight(json) {
+        if (typeof json === 'string') {
+            json = JSON.stringify(JSON.parse(json), null, 2);
+        }
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return json.replace(
+            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+            function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    cls = /:$/.test(match) ? 'json-key' : 'json-string';
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            }
+        );
+    }
+
+    // --- LLM Result Rendering (generic) ---
+    const fieldLabels = {
+        receipt_type: '영수증 유형', merchant_name: '상호명', merchant_address: '주소',
+        transaction_date: '거래일', currency: '통화', subtotal: '소계', tax: '세금',
+        tip: '팁', total: '합계', hotel_name: '호텔명', guest_name: '투숙객',
+        confirmation_number: '예약번호', check_in: '체크인', check_out: '체크아웃',
+        nights: '숙박일수', room_type: '객실 타입', resort_fee: '리조트 피',
+        nightly_charges: '일별 숙박 요금', extra_charges: '추가 요금',
+        payment_method: '결제수단', savings: '할인/절약', discount: '할인',
+        notes: '비고', booked_for: '예약자',
+        transport_type: '교통수단', booking_reference: '예약번호', passenger_name: '승객',
+        distance: '거리', duration: '소요시간', surcharge: '할증료',
+        legs: '구간 정보', items: '세부 항목',
+        table_number: '테이블', server_name: '담당 직원', guests: '인원',
+        service_charge: '서비스 차지', title: '제목', page_count: '페이지 수',
+        language: '언어', summary: '요약', tables_count: '테이블 수',
+        menu_item: '메뉴', description: '항목', quantity: '수량', unit_price: '단가',
+        total_price: '금액', rate: '요금', date: '날짜', amount: '금액',
+        departure: '출발', arrival: '도착', departure_time: '출발 시간',
+        arrival_time: '도착 시간', fare: '요금',
+    };
+
+    function label(key) { return fieldLabels[key] || key; }
+
+    function renderLlm(analysis) {
+        const el = document.getElementById('llmContent');
+        let html = '';
+
+        // Document Summary
+        html += '<div class="summary-section">';
+        html += '<h3>📋 문서 요약</h3>';
+        html += renderObject(analysis.document_summary);
+        html += '</div>';
+
+        // Receipt Summary
+        const rtype = analysis.receipt_summary?.receipt_type;
+        const typeIcons = { general: '🧾', restaurant: '🍽️', hotel: '🏨', transportation: '🚕' };
+        html += '<div class="summary-section">';
+        html += `<h3>${typeIcons[rtype] || '🧾'} 영수증 분석</h3>`;
+        html += renderObject(analysis.receipt_summary);
+        html += '</div>';
+
+        el.innerHTML = html;
+    }
+
+    function renderObject(obj) {
+        if (!obj || typeof obj !== 'object') return '';
+        let scalarHtml = '';
+        let arrayHtml = '';
+
+        for (const [key, val] of Object.entries(obj)) {
+            if (val == null) continue;
+
+            if (Array.isArray(val)) {
+                // Array of strings → tags
+                if (val.length && typeof val[0] === 'string') {
+                    scalarHtml += `<div class="label">${label(key)}</div><div class="value"><div class="tag-list">`;
+                    val.forEach(v => { scalarHtml += `<span class="tag">${escapeHtml(String(v))}</span>`; });
+                    scalarHtml += '</div></div>';
+                }
+                // Array of objects → table
+                else if (val.length && typeof val[0] === 'object') {
+                    arrayHtml += renderTable(key, val);
+                }
+            } else if (typeof val === 'object') {
+                arrayHtml += `<h4 style="margin-top:16px;font-size:13px;color:#555;">${label(key)}</h4>`;
+                arrayHtml += renderObject(val);
+            } else {
+                const display = typeof val === 'number' ? formatNumber(val) : escapeHtml(String(val));
+                const bold = key === 'total' ? `<strong>${display}</strong>` : display;
+                scalarHtml += `<div class="label">${label(key)}</div><div class="value">${bold}</div>`;
+            }
+        }
+
+        let html = '';
+        if (scalarHtml) html += `<div class="summary-grid">${scalarHtml}</div>`;
+        if (arrayHtml) html += arrayHtml;
+        return html;
+    }
+
+    function renderTable(title, rows) {
+        if (!rows.length) return '';
+        const keys = Object.keys(rows[0]);
+        let html = `<h4 style="margin-top:16px;font-size:13px;color:#555;">${label(title)}</h4>`;
+        html += '<table class="item-table"><thead><tr>';
+        keys.forEach(k => { html += `<th>${label(k)}</th>`; });
+        html += '</tr></thead><tbody>';
+        rows.forEach(row => {
+            html += '<tr>';
+            keys.forEach(k => {
+                const v = row[k];
+                const display = v == null ? '-' : (typeof v === 'number' ? formatNumber(v) : escapeHtml(String(v)));
+                html += `<td>${display}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+    }
+
+    function formatNumber(n) {
+        if (n == null) return '-';
+        return n.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    // --- Init ---
+    loadFiles();
+</script>
+</body>
+</html>

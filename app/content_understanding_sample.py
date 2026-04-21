@@ -8,6 +8,7 @@ Authentication: Azure Managed Identity (DefaultAzureCredential).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import cast
 
@@ -19,8 +20,9 @@ from azure.ai.contentunderstanding.models import (
 
 from auth import get_credential
 from config import CONTENT_UNDERSTANDING_ENDPOINT
-from llm import extract_structured, pretty_print
-from models import DocumentSummary, ReceiptSummary
+from llm import extract_raw, extract_structured, pretty_print
+from models import DocumentSummary
+from prompts import get_instruction
 
 SAMPLE_FILE = Path(__file__).parent / "sample_files" / "trip-receipt.pdf"
 
@@ -91,7 +93,7 @@ def main() -> None:
     doc_summary = extract_structured(
         markdown,
         DocumentSummary,
-        instruction="Summarize this document. Extract title, language, key phrases, and a brief summary.",
+        instruction=get_instruction("document_summary"),
     )
     print(pretty_print(doc_summary))
 
@@ -100,12 +102,11 @@ def main() -> None:
     receipt_text = analyze_receipt(SAMPLE_FILE)
     print("  Raw receipt data extracted. Sending to LLM for structuring...")
 
-    receipt = extract_structured(
+    receipt = extract_raw(
         receipt_text,
-        ReceiptSummary,
-        instruction="Extract structured receipt information including merchant, items, and totals.",
+        instruction=get_instruction("receipt_extraction"),
     )
-    print(pretty_print(receipt))
+    print(json.dumps(receipt, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
