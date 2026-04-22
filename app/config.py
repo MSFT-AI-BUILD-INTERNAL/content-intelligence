@@ -12,14 +12,14 @@ CONTENT_UNDERSTANDING_ENDPOINT = os.getenv(
     "https://jinsungpark-westus-resource.services.ai.azure.com",
 )
 
-# Azure OpenAI endpoint (cognitiveservices, used for LLM chat completions)
+# Azure AI Foundry project endpoint (used for LLM chat completions)
 AZURE_OPENAI_ENDPOINT = os.getenv(
     "AZURE_OPENAI_ENDPOINT",
-    "https://jinsungpark-westus-resource.cognitiveservices.azure.com",
+    "https://jinsang-foundry.services.ai.azure.com/api/projects/proj",
 )
 
 # LLM deployment name (used for structured output refinement)
-LLM_DEPLOYMENT = os.getenv("LLM_DEPLOYMENT", "gpt-4-1-mini")
+LLM_DEPLOYMENT = os.getenv("LLM_DEPLOYMENT", "gpt-5.2-chat")
 
 # Azure AI Document Intelligence
 DOCUMENT_INTELLIGENCE_ENDPOINT = os.getenv(
