@@ -1,7 +1,7 @@
 """
 LLM helper — call Azure OpenAI chat completions to produce structured output.
 
-Uses the Azure OpenAI SDK with Managed Identity authentication.
+Uses the Azure AI Foundry v1 API with Managed Identity authentication.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import json
 from typing import TypeVar
 
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from openai import AzureOpenAI
+from openai import OpenAI
 from pydantic import BaseModel
 
 from config import AZURE_OPENAI_ENDPOINT, LLM_DEPLOYMENT
@@ -39,15 +39,14 @@ def _make_strict_schema(schema: dict) -> dict:
     return schema
 
 
-def _build_client() -> AzureOpenAI:
+def _build_client() -> OpenAI:
     token_provider = get_bearer_token_provider(
         DefaultAzureCredential(),
         "https://ai.azure.com/.default",
     )
-    return AzureOpenAI(
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-        azure_ad_token_provider=token_provider,
-        api_version="2024-10-21",
+    return OpenAI(
+        base_url=f"{AZURE_OPENAI_ENDPOINT.rstrip('/')}/openai/v1/",
+        api_key=token_provider,
     )
 
 

@@ -12,10 +12,10 @@ CONTENT_UNDERSTANDING_ENDPOINT = os.getenv(
     "https://jinsungpark-westus-resource.services.ai.azure.com",
 )
 
-# Azure AI Foundry project endpoint (used for LLM chat completions)
+# Azure AI Foundry resource endpoint (v1 API — /openai/v1/ is appended in llm.py)
 AZURE_OPENAI_ENDPOINT = os.getenv(
     "AZURE_OPENAI_ENDPOINT",
-    "https://jinsang-foundry.services.ai.azure.com/api/projects/proj",
+    "https://jinsang-foundry.services.ai.azure.com",
 )
 
 # LLM deployment name (used for structured output refinement)
