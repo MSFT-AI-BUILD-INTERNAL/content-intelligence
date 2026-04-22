@@ -47,7 +47,7 @@ def _build_client() -> AzureOpenAI:
     return AzureOpenAI(
         azure_endpoint=AZURE_OPENAI_ENDPOINT,
         azure_ad_token_provider=token_provider,
-        api_version="2025-03-01-preview",
+        api_version="2024-10-21",
     )
 
 
