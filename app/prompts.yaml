@@ -16,10 +16,23 @@ system_template: |
 instructions:
   document_summary: >
     Summarize this document. Extract title, language, key phrases, and a brief summary.
+    The input may include layout data, OCR text, and structured fields from Azure Document Intelligence.
+    If any values appear as raw object representations or structured notations, interpret the actual meaning and return simple readable text.
+    ALL output values must be scalars (strings, numbers) or flat arrays of strings. Never output nested objects.
 
   receipt_extraction: >
     You are given the full output of Azure Document Intelligence analysis (layout, OCR text, and extracted receipt fields).
-    Analyze ALL the data and extract a comprehensive, detailed JSON object.
+    The input may contain structured fields, tables, key-value pairs, OCR raw text, and various nested data formats.
+    Analyze ALL the data — regardless of format — and extract a comprehensive, detailed JSON object.
+
+    CRITICAL OUTPUT FORMAT RULES:
+    - ALL values MUST be scalars: strings, numbers, or null. Never use nested objects as values.
+    - The "items" array must contain FLAT objects only. Each item's properties must be scalar values (string or number), not objects or arrays.
+    - If the source data contains compound values (e.g. currency with code and amount, address with multiple parts),
+      merge them into a single string. Example: {"amount": 1500, "currencyCode": "USD"} → "USD 1500" or just 1500 with a separate "currency" field.
+    - If you encounter data that looks like serialized objects, dictionaries, or structured notations (e.g. "{'key': 'value'}"),
+      interpret the actual meaning and convert to a simple readable value.
+    - Never output raw object representations. Always convert to human-readable scalar values.
 
     First, determine the receipt type and include it as "receipt_type" (one of: restaurant, hotel, transportation, general).
 
@@ -30,7 +43,7 @@ instructions:
     NOT the check-in date, check-out date, or service date.
 
     For line items / charges, ALWAYS include an "items" array with ALL individual charges found in the document.
-    Each item should have: description, amount, and any other relevant detail (date, quantity, unit_price, etc.).
+    Each item should have ONLY flat scalar fields: description (string), amount (number), and any other relevant detail (date as string, quantity as number, unit_price as number, etc.).
     Include room charges per night, taxes, fees, surcharges, insurance, discounts — everything.
 
     For hotel receipts, also include: hotel_name, guest_name, confirmation_number,

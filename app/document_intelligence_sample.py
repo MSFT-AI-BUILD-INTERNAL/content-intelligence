@@ -55,6 +55,11 @@ def analyze_layout(file_path: Path) -> str:
 def _serialize_field(field, indent: int = 0) -> str:
     """Recursively serialize a Document Intelligence field to readable text."""
     prefix = "  " * indent
+
+    # Handle non-dict values (raw scalars that slipped through)
+    if not isinstance(field, dict):
+        return str(field)
+
     field_type = field.get("type", "")
 
     # Array field (e.g. Items)
@@ -75,7 +80,9 @@ def _serialize_field(field, indent: int = 0) -> str:
     # Scalar fields — try various value types
     for value_key in ("valueString", "valueNumber", "valueInteger",
                       "valueDate", "valueTime", "valueCurrencyAmount",
-                      "valuePhoneNumber", "valueCountryRegion"):
+                      "valuePhoneNumber", "valueCountryRegion",
+                      "valueSelectionMark", "valueSignature",
+                      "valueAddress", "valueBoolean"):
         val = field.get(value_key)
         if val is not None:
             # Currency has amount + currencyCode
@@ -83,10 +90,30 @@ def _serialize_field(field, indent: int = 0) -> str:
                 amount = val.get("amount", "")
                 code = val.get("currencyCode", "")
                 return f"{code} {amount}" if code else str(amount)
+            # Address may be a dict with structured parts
+            if value_key == "valueAddress" and isinstance(val, dict):
+                addr_parts = [
+                    val.get("streetAddress", ""),
+                    val.get("city", ""),
+                    val.get("state", ""),
+                    val.get("postalCode", ""),
+                    val.get("countryRegion", ""),
+                ]
+                return ", ".join(p for p in addr_parts if p)
+            # Any other dict value — serialize to readable string
+            if isinstance(val, dict):
+                return json.dumps(val, ensure_ascii=False)
+            if isinstance(val, list):
+                return ", ".join(str(v) for v in val)
             return str(val)
 
-    # Fallback to content
-    return field.get("content", "")
+    # Fallback to content, then to JSON dump of the whole field
+    content = field.get("content", "")
+    if content:
+        return str(content)
+
+    # Last resort: dump the field as JSON so it's at least readable text
+    return json.dumps(field, ensure_ascii=False, default=str)
 
 
 def analyze_receipt(file_path: Path) -> str:

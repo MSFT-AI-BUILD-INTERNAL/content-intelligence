@@ -576,19 +576,37 @@
         return html;
     }
 
+    function formatValue(v) {
+        if (v == null) return '-';
+        if (typeof v === 'number') return formatNumber(v);
+        if (typeof v === 'object') {
+            // Flatten nested objects/arrays to readable text instead of [Object Object]
+            if (Array.isArray(v)) {
+                return escapeHtml(v.map(item =>
+                    typeof item === 'object' ? JSON.stringify(item) : String(item)
+                ).join(', '));
+            }
+            // Single nested object: show as "key: value" pairs
+            return escapeHtml(Object.entries(v)
+                .filter(([, val]) => val != null)
+                .map(([k, val]) => `${label(k)}: ${typeof val === 'object' ? JSON.stringify(val) : val}`)
+                .join(', '));
+        }
+        return escapeHtml(String(v));
+    }
+
     function renderTable(title, rows) {
         if (!rows.length) return '';
-        const keys = Object.keys(rows[0]);
+        // Collect all keys across all rows, and flatten nested objects into scalar columns
+        const allKeys = [...new Set(rows.flatMap(r => Object.keys(r)))];
         let html = `<h4 style="margin-top:16px;font-size:13px;color:#555;">${label(title)}</h4>`;
         html += '<table class="item-table"><thead><tr>';
-        keys.forEach(k => { html += `<th>${label(k)}</th>`; });
+        allKeys.forEach(k => { html += `<th>${label(k)}</th>`; });
         html += '</tr></thead><tbody>';
         rows.forEach(row => {
             html += '<tr>';
-            keys.forEach(k => {
-                const v = row[k];
-                const display = v == null ? '-' : (typeof v === 'number' ? formatNumber(v) : escapeHtml(String(v)));
-                html += `<td>${display}</td>`;
+            allKeys.forEach(k => {
+                html += `<td>${formatValue(row[k])}</td>`;
             });
             html += '</tr>';
         });
