@@ -42,7 +42,7 @@ def _make_strict_schema(schema: dict) -> dict:
 def _build_client() -> AzureOpenAI:
     token_provider = get_bearer_token_provider(
         DefaultAzureCredential(),
-        "https://cognitiveservices.azure.com/.default",
+        "https://ai.azure.com/.default",
     )
     return AzureOpenAI(
         azure_endpoint=AZURE_OPENAI_ENDPOINT,
