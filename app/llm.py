@@ -79,10 +79,7 @@ def extract_structured(
                 "strict": True,
             },
         },
-        temperature=0.0,
     )
-
-    content = response.choices[0].message.content
     return model_class.model_validate_json(content)
 
 
@@ -109,7 +106,6 @@ def extract_raw(raw_text: str, instruction: str) -> dict:
             {"role": "user", "content": raw_text},
         ],
         response_format={"type": "json_object"},
-        temperature=0.0,
     )
 
     return json.loads(response.choices[0].message.content)
