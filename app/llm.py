@@ -80,6 +80,8 @@ def extract_structured(
             },
         },
     )
+
+    content = response.choices[0].message.content
     return model_class.model_validate_json(content)
 
 
