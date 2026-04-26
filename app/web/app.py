@@ -1,12 +1,11 @@
 """
-Web application for Document Intelligence + LLM analysis.
+Web application for Content Understanding + LLM analysis.
 
 Run: uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -16,7 +15,7 @@ from core.config import SAMPLE_FILES_DIR
 from core.llm import extract_raw, extract_structured
 from core.models import DocumentSummary
 from core.prompts import get_instruction
-from services.document_intelligence import analyze_layout, analyze_read, analyze_receipt
+from services.content_understanding import analyze
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -43,7 +42,7 @@ async def list_files():
 
 @app.post("/api/analyze/{filename}")
 async def analyze_file(filename: str):
-    """Run Document Intelligence + LLM analysis on a file."""
+    """Run Content Understanding + LLM analysis on a file."""
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
@@ -55,38 +54,26 @@ async def analyze_file(filename: str):
     if not str(resolved).startswith(str(SAMPLE_FILES_DIR.resolve())):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
-    # --- Document Intelligence ---
-    layout_text = analyze_layout(file_path)
-    ocr_text = analyze_read(file_path)
-    receipt_text = analyze_receipt(file_path)
-
-    di_result = {
-        "layout": layout_text,
-        "ocr_content": ocr_text,
-        "receipt_fields": receipt_text,
-    }
+    # --- Content Understanding: single call to extract markdown ---
+    markdown = analyze(file_path)
 
     # --- LLM Structured Output ---
-    all_di_text = (
-        f"=== Layout ===\n{layout_text}\n\n"
-        f"=== OCR Full Text ===\n{ocr_text}\n\n"
-        f"=== Receipt Fields ===\n{receipt_text}"
-    )
-
     doc_summary = extract_structured(
-        all_di_text,
+        markdown,
         DocumentSummary,
         instruction=get_instruction("document_summary"),
     )
 
     receipt_summary = extract_raw(
-        all_di_text,
+        markdown,
         instruction=get_instruction("receipt_extraction"),
     )
 
     return {
         "filename": filename,
-        "document_intelligence": di_result,
+        "content_understanding": {
+            "markdown": markdown,
+        },
         "llm_analysis": {
             "document_summary": doc_summary.model_dump(exclude_none=True),
             "receipt_summary": receipt_summary,

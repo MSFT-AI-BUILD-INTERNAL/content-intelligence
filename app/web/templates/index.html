@@ -328,7 +328,7 @@
 <header>
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/><path d="M8 12h8v2H8zm0 4h5v2H8z"/></svg>
     <h1>Content Intelligence</h1>
-    <span>Azure Document Intelligence + LLM Analysis</span>
+    <span>Azure Content Understanding + LLM Analysis</span>
 </header>
 
 <div class="container">
@@ -346,7 +346,7 @@
             <div class="spinner"></div>
             <div class="loading-text">분석 중...</div>
             <div class="loading-steps">
-                Document Intelligence로 문서 분석 중<br>
+                Content Understanding으로 문서 분석 중<br>
                 LLM으로 구조화된 데이터 추출 중
             </div>
         </div>
@@ -357,16 +357,14 @@
         </div>
 
         <div class="result-panels" id="resultPanels">
-            <!-- Top: JSON -->
+            <!-- Top: Content Understanding result -->
             <div class="json-panel">
                 <div class="panel-header">
-                    <span>📄 Document Intelligence 결과</span>
-                    <span class="badge">JSON</span>
+                    <span>📄 Content Understanding 결과</span>
+                    <span class="badge">Markdown</span>
                 </div>
                 <div class="tab-bar">
-                    <div class="tab active" data-tab="layout">Layout</div>
-                    <div class="tab" data-tab="ocr">OCR Content</div>
-                    <div class="tab" data-tab="receipt">Receipt Fields</div>
+                    <div class="tab active" data-tab="markdown">Markdown</div>
                     <div class="tab" data-tab="raw">Raw JSON</div>
                 </div>
                 <div class="json-content" id="jsonContent">
@@ -432,7 +430,7 @@
             if (!res.ok) throw new Error(`Error: ${res.status}`);
             currentData = await res.json();
 
-            renderJson('layout');
+            renderJson('markdown');
             renderLlm(currentData.llm_analysis);
 
             document.getElementById('resultPanels').classList.add('visible');
@@ -458,14 +456,10 @@
         const pre = document.getElementById('jsonPre');
         let text = '';
 
-        if (tab === 'layout') {
-            text = currentData.document_intelligence.layout;
-        } else if (tab === 'ocr') {
-            text = currentData.document_intelligence.ocr_content;
-        } else if (tab === 'receipt') {
-            text = currentData.document_intelligence.receipt_fields;
+        if (tab === 'markdown') {
+            text = currentData.content_understanding.markdown;
         } else if (tab === 'raw') {
-            text = JSON.stringify(currentData.document_intelligence, null, 2);
+            text = JSON.stringify(currentData.content_understanding, null, 2);
         }
 
         if (tab === 'raw') {
