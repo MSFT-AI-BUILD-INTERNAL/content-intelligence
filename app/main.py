@@ -21,12 +21,12 @@ def _banner() -> None:
 
 
 def run_content_understanding() -> None:
-    from content_understanding_sample import main as cu_main
+    from samples.content_understanding import main as cu_main
     cu_main()
 
 
 def run_document_intelligence() -> None:
-    from document_intelligence_sample import main as di_main
+    from samples.document_intelligence import main as di_main
     di_main()
 
 

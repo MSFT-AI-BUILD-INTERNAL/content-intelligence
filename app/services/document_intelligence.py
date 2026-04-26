@@ -1,8 +1,7 @@
 """
-Document Intelligence sample — analyze a receipt with Azure AI Document Intelligence.
+Document Intelligence service — extract document content via Azure AI.
 
-Analyzes sample_files/trip-receipt.pdf using prebuilt models,
-then refines the output into structured JSON via LLM.
+Uses prebuilt models (layout, read, receipt) and returns structured text.
 Authentication: Azure Managed Identity (DefaultAzureCredential).
 """
 
@@ -13,13 +12,8 @@ from pathlib import Path
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 
-from auth import get_credential
-from config import DOCUMENT_INTELLIGENCE_ENDPOINT
-from llm import extract_raw, extract_structured, pretty_print
-from models import DocumentSummary
-from prompts import get_instruction
-
-SAMPLE_FILE = Path(__file__).parent / "sample_files" / "trip-receipt.pdf"
+from core.auth import get_credential
+from core.config import DOCUMENT_INTELLIGENCE_ENDPOINT
 
 
 def _build_client() -> DocumentIntelligenceClient:
@@ -56,7 +50,6 @@ def _serialize_field(field, indent: int = 0) -> str:
     """Recursively serialize a Document Intelligence field to readable text."""
     prefix = "  " * indent
 
-    # Handle non-dict values (raw scalars that slipped through)
     if not isinstance(field, dict):
         return str(field)
 
@@ -77,7 +70,7 @@ def _serialize_field(field, indent: int = 0) -> str:
             parts.append(f"{prefix}{key}: {_serialize_field(sub_field, indent)}")
         return "\n".join(parts)
 
-    # Scalar fields — try various value types
+    # Scalar fields
     for value_key in ("valueString", "valueNumber", "valueInteger",
                       "valueDate", "valueTime", "valueCurrencyAmount",
                       "valuePhoneNumber", "valueCountryRegion",
@@ -85,12 +78,10 @@ def _serialize_field(field, indent: int = 0) -> str:
                       "valueAddress", "valueBoolean"):
         val = field.get(value_key)
         if val is not None:
-            # Currency has amount + currencyCode
             if value_key == "valueCurrencyAmount" and isinstance(val, dict):
                 amount = val.get("amount", "")
                 code = val.get("currencyCode", "")
                 return f"{code} {amount}" if code else str(amount)
-            # Address may be a dict with structured parts
             if value_key == "valueAddress" and isinstance(val, dict):
                 addr_parts = [
                     val.get("streetAddress", ""),
@@ -100,19 +91,16 @@ def _serialize_field(field, indent: int = 0) -> str:
                     val.get("countryRegion", ""),
                 ]
                 return ", ".join(p for p in addr_parts if p)
-            # Any other dict value — serialize to readable string
             if isinstance(val, dict):
                 return json.dumps(val, ensure_ascii=False)
             if isinstance(val, list):
                 return ", ".join(str(v) for v in val)
             return str(val)
 
-    # Fallback to content, then to JSON dump of the whole field
     content = field.get("content", "")
     if content:
         return str(content)
 
-    # Last resort: dump the field as JSON so it's at least readable text
     return json.dumps(field, ensure_ascii=False, default=str)
 
 
@@ -150,46 +138,3 @@ def analyze_read(file_path: Path) -> str:
     result = poller.result()
 
     return result.content
-
-
-def main() -> None:
-    print("=" * 60)
-    print("  Document Intelligence — trip-receipt.pdf")
-    print("=" * 60)
-
-    if not SAMPLE_FILE.exists():
-        print(f"\n[ERROR] File not found: {SAMPLE_FILE}")
-        return
-
-    # 1. Layout + OCR → structured document summary via LLM
-    print("\n--- 1. Document Analysis (structured) ---")
-    print(f"[Document Intelligence] Analyzing layout: {SAMPLE_FILE.name}")
-    layout_text = analyze_layout(SAMPLE_FILE)
-    print(f"[Document Intelligence] Running OCR: {SAMPLE_FILE.name}")
-    ocr_text = analyze_read(SAMPLE_FILE)
-
-    combined = f"=== Layout ===\n{layout_text}\n\n=== OCR Content ===\n{ocr_text}"
-    print("  Raw data extracted. Sending to LLM for structuring...")
-
-    doc_summary = extract_structured(
-        combined,
-        DocumentSummary,
-        instruction=get_instruction("document_summary"),
-    )
-    print(pretty_print(doc_summary))
-
-    # 2. Receipt analysis → structured receipt via LLM
-    print("\n--- 2. Receipt Analysis (structured) ---")
-    print(f"[Document Intelligence] Analyzing receipt: {SAMPLE_FILE.name}")
-    receipt_text = analyze_receipt(SAMPLE_FILE)
-    print("  Raw receipt data extracted. Sending to LLM for structuring...")
-
-    receipt = extract_raw(
-        receipt_text,
-        instruction=get_instruction("receipt_extraction"),
-    )
-    print(json.dumps(receipt, indent=2, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()

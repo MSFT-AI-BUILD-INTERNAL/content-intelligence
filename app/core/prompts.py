@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 
 import yaml
 
-_PROMPTS_PATH = Path(__file__).parent / "prompts.yaml"
+from core.config import PROMPTS_FILE
 
 
 @lru_cache(maxsize=1)
 def _load() -> dict:
-    with open(_PROMPTS_PATH, encoding="utf-8") as f:
+    with open(PROMPTS_FILE, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

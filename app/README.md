@@ -2,23 +2,30 @@
 
 Azure **Content Understanding** 및 **Document Intelligence** 서비스를 **Azure Managed Identity**로 연동하는 Python 샘플 앱입니다. API Key는 사용하지 않습니다.
 
-## 아키텍처
+## 프로젝트 구조
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   main.py                       │
-│         (CLI entry — 서비스 선택/전체 실행)        │
-├────────────────────┬────────────────────────────┤
-│  Content           │  Document                  │
-│  Understanding     │  Intelligence              │
-│  Sample            │  Sample                    │
-├────────────────────┴────────────────────────────┤
-│              auth.py                            │
-│   DefaultAzureCredential (Managed Identity)     │
-├─────────────────────────────────────────────────┤
-│              config.py (.env)                   │
-│   Endpoints configuration                       │
-└─────────────────────────────────────────────────┘
+app/
+├── core/                              # 공통 인프라
+│   ├── auth.py                        #   인증 (DefaultAzureCredential)
+│   ├── config.py                      #   환경 변수 / 경로 설정
+│   ├── llm.py                         #   LLM 호출 (구조화 출력)
+│   ├── models.py                      #   Pydantic 모델
+│   ├── prompts.py                     #   프롬프트 로더
+│   └── prompts.yaml                   #   시스템 / 태스크 프롬프트
+├── services/                          # Azure 서비스 래퍼
+│   ├── content_understanding.py       #   Content Understanding 클라이언트
+│   └── document_intelligence.py       #   Document Intelligence 클라이언트
+├── samples/                           # CLI 데모 스크립트
+│   ├── content_understanding.py       #   CU 샘플 실행
+│   └── document_intelligence.py       #   DI 샘플 실행
+├── web/                               # 웹 애플리케이션
+│   ├── app.py                         #   FastAPI 라우트
+│   └── templates/index.html           #   웹 UI
+├── sample_files/                      # 테스트 문서 (PDF, 이미지)
+├── main.py                            # CLI 진입점
+├── pyproject.toml
+└── .env.example
 ```
 
 ## 사전 요구 사항
@@ -29,7 +36,7 @@ Azure **Content Understanding** 및 **Document Intelligence** 서비스를 **Azu
 
 2. **로컬 개발 시**: `az login` 또는 VS Code Azure 확장을 통해 인증
 
-3. **Python 3.9+**
+3. **Python 3.10+**
 
 ## 설치
 
@@ -49,11 +56,12 @@ cp .env.example .env
 # .env 파일을 열어 엔드포인트를 확인/수정하세요
 ```
 
-| 변수 | 설명 | 기본값 |
-|------|------|--------|
-| `FOUNDRY_ENDPOINT` | AI Foundry 프로젝트 엔드포인트 | `https://jinsungpark-westus-resource.services.ai.azure.com/api/projects/jinsungpark-westus` |
-| `LLM_DEPLOYMENT` | LLM 배포 이름 (구조화 출력용) | `gpt-4o` |
-| `DOCUMENT_INTELLIGENCE_ENDPOINT` | Document Intelligence 엔드포인트 | `https://jinsungpark-westus-resource.cognitiveservices.azure.com/` |
+| 변수 | 설명 |
+|------|------|
+| `CONTENT_UNDERSTANDING_ENDPOINT` | Content Understanding 리소스 엔드포인트 |
+| `AZURE_OPENAI_ENDPOINT` | Azure AI Foundry 리소스 엔드포인트 (v1 API) |
+| `LLM_DEPLOYMENT` | LLM 배포 이름 (구조화 출력용) |
+| `DOCUMENT_INTELLIGENCE_ENDPOINT` | Document Intelligence 엔드포인트 |
 
 ## 실행
 
@@ -66,26 +74,27 @@ uv run python main.py content-understanding
 
 # Document Intelligence만
 uv run python main.py document-intelligence
+
+# 웹 앱 실행
+uv run uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
 ```
-
-## 샘플 파일
-
-`sample_files/trip-receipt.pdf`를 분석 대상으로 사용합니다.
 
 ## 주요 기능
 
-### Content Understanding (`content_understanding_sample.py`)
-- **문서 분석** — `prebuilt-documentSearch` → LLM으로 `DocumentSummary` JSON 출력
-- **영수증 필드 추출** — `prebuilt-receipt` → LLM으로 `ReceiptSummary` JSON 출력
+### Content Understanding (`services/content_understanding.py`)
+- `prebuilt-layout` 분석기로 문서 마크다운 추출
+- LLM으로 `DocumentSummary` / 영수증 필드 JSON 구조화 출력
 
-### Document Intelligence (`document_intelligence_sample.py`)
-- **레이아웃 + OCR 분석** — `prebuilt-layout` + `prebuilt-read` → LLM으로 `DocumentSummary` JSON 출력
-- **영수증 분석** — `prebuilt-receipt` → LLM으로 `ReceiptSummary` JSON 출력
+### Document Intelligence (`services/document_intelligence.py`)
+- `prebuilt-layout` — 레이아웃 분석
+- `prebuilt-read` — OCR 텍스트 추출
+- `prebuilt-receipt` — 영수증 필드 추출
+- LLM으로 구조화된 JSON 정제
 
-### 구조화 출력 (`models.py`, `llm.py`)
-- Pydantic 모델 기반 (`ReceiptSummary`, `DocumentSummary`)
-- Foundry 프로젝트의 LLM (gpt-4o)을 통해 원본 텍스트를 구조화된 JSON으로 정제
-- `JsonSchemaFormat`을 사용한 Structured Output 보장
+### 구조화 출력 (`core/llm.py`, `core/models.py`)
+- Pydantic 모델 기반 (`DocumentSummary`)
+- Azure AI Foundry LLM을 통해 원본 텍스트를 구조화된 JSON으로 정제
+- `json_schema` response format을 사용한 Structured Output 보장
 
 ## 인증 방식
 

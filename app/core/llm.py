@@ -13,8 +13,8 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import OpenAI
 from pydantic import BaseModel
 
-from config import AZURE_OPENAI_ENDPOINT, LLM_DEPLOYMENT
-from prompts import get_system_template
+from core.config import AZURE_OPENAI_ENDPOINT, LLM_DEPLOYMENT
+from core.prompts import get_system_template
 
 T = TypeVar("T", bound=BaseModel)
 

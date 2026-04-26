@@ -1,7 +1,7 @@
 """
 Web application for Document Intelligence + LLM analysis.
 
-Run: uvicorn webapp:app --host 0.0.0.0 --port 8000 --reload
+Run: uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
 """
 
 from __future__ import annotations
@@ -10,15 +10,15 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 
-from document_intelligence_sample import analyze_layout, analyze_read, analyze_receipt
-from llm import extract_raw, extract_structured
-from models import DocumentSummary
-from prompts import get_instruction
+from core.config import SAMPLE_FILES_DIR
+from core.llm import extract_raw, extract_structured
+from core.models import DocumentSummary
+from core.prompts import get_instruction
+from services.document_intelligence import analyze_layout, analyze_read, analyze_receipt
 
-SAMPLE_DIR = Path(__file__).parent / "sample_files"
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 app = FastAPI(title="Content Intelligence Web")
 
@@ -26,17 +26,17 @@ app = FastAPI(title="Content Intelligence Web")
 @app.get("/", response_class=HTMLResponse)
 async def index():
     """Serve the main HTML page."""
-    html_path = Path(__file__).parent / "templates" / "index.html"
+    html_path = TEMPLATES_DIR / "index.html"
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
 @app.get("/api/files")
 async def list_files():
     """Return list of files in sample_files directory."""
-    if not SAMPLE_DIR.exists():
+    if not SAMPLE_FILES_DIR.exists():
         return {"files": []}
     files = sorted(
-        f.name for f in SAMPLE_DIR.iterdir() if f.is_file() and not f.name.startswith(".")
+        f.name for f in SAMPLE_FILES_DIR.iterdir() if f.is_file() and not f.name.startswith(".")
     )
     return {"files": files}
 
@@ -44,17 +44,15 @@ async def list_files():
 @app.post("/api/analyze/{filename}")
 async def analyze_file(filename: str):
     """Run Document Intelligence + LLM analysis on a file."""
-    # Prevent path traversal
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    file_path = SAMPLE_DIR / filename
+    file_path = SAMPLE_FILES_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Resolve to ensure it's still inside SAMPLE_DIR
     resolved = file_path.resolve()
-    if not str(resolved).startswith(str(SAMPLE_DIR.resolve())):
+    if not str(resolved).startswith(str(SAMPLE_FILES_DIR.resolve())):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
     # --- Document Intelligence ---
@@ -81,7 +79,6 @@ async def analyze_file(filename: str):
         instruction=get_instruction("document_summary"),
     )
 
-    # Receipt: send all DI data so LLM can extract every detail
     receipt_summary = extract_raw(
         all_di_text,
         instruction=get_instruction("receipt_extraction"),
@@ -95,3 +92,9 @@ async def analyze_file(filename: str):
             "receipt_summary": receipt_summary,
         },
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("web.app:app", host="0.0.0.0", port=8000, reload=True)

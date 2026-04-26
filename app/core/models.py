@@ -12,4 +12,3 @@ class DocumentSummary(BaseModel):
     summary: str = Field(description="Brief summary of the document content")
     key_phrases: list[str] = Field(default_factory=list, description="Key phrases or topics")
     tables_count: int = Field(default=0, description="Number of tables found")
-    tables_count: int = Field(default=0, description="Number of tables found")
