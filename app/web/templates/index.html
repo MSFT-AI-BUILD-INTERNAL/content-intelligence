@@ -259,6 +259,47 @@
 
         .item-table tr:hover td { background: #fafafa; }
 
+        /* Metrics bar */
+        .metrics-bar {
+            display: flex;
+            gap: 16px;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .metric-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .metric-item .metric-icon {
+            font-size: 14px;
+        }
+
+        .metric-item .metric-label {
+            color: #888;
+            font-weight: 500;
+        }
+
+        .metric-item .metric-value {
+            font-weight: 700;
+            color: #0078d4;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+        }
+
+        .metric-divider {
+            width: 1px;
+            height: 20px;
+            background: #ddd;
+        }
+
         /* Loading overlay */
         .loading-overlay {
             position: absolute;
@@ -328,13 +369,13 @@
 <header>
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/><path d="M8 12h8v2H8zm0 4h5v2H8z"/></svg>
     <h1>Content Intelligence</h1>
-    <span>Azure Content Understanding + LLM Analysis</span>
+    <span>Azure Document Intelligence + LLM Analysis</span>
 </header>
 
 <div class="container">
     <!-- Left: File List -->
     <div class="sidebar">
-        <div class="sidebar-header">📁 Sample Files</div>
+        <div class="sidebar-header">📁 Invoice Files</div>
         <div class="file-list" id="fileList">
             <div style="padding: 20px; color: #aaa; font-size: 13px;">Loading...</div>
         </div>
@@ -346,7 +387,7 @@
             <div class="spinner"></div>
             <div class="loading-text">분석 중...</div>
             <div class="loading-steps">
-                Content Understanding으로 문서 분석 중<br>
+                Document Intelligence로 문서 분석 중<br>
                 LLM으로 구조화된 데이터 추출 중
             </div>
         </div>
@@ -357,10 +398,46 @@
         </div>
 
         <div class="result-panels" id="resultPanels">
-            <!-- Top: Content Understanding result -->
+            <!-- Metrics Bar -->
+            <div class="metrics-bar" id="metricsBar">
+                <div class="metric-item">
+                    <span class="metric-icon">📄</span>
+                    <span class="metric-label">페이지:</span>
+                    <span class="metric-value" id="metricPageCount">—</span>
+                </div>
+                <div class="metric-divider"></div>
+                <div class="metric-item">
+                    <span class="metric-icon">⚡</span>
+                    <span class="metric-label">Document Intelligence:</span>
+                    <span class="metric-value" id="metricDiTime">—</span>
+                </div>
+                <div class="metric-divider"></div>
+                <div class="metric-item">
+                    <span class="metric-icon">🤖</span>
+                    <span class="metric-label">LLM 처리:</span>
+                    <span class="metric-value" id="metricLlmTime">—</span>
+                </div>
+                <div class="metric-divider"></div>
+                <div class="metric-item">
+                    <span class="metric-icon">🪙</span>
+                    <span class="metric-label">토큰 사용량:</span>
+                    <span class="metric-value" id="metricTokenTotal">—</span>
+                </div>
+                <div class="metric-divider"></div>
+                <div class="metric-item">
+                    <span class="metric-label">입력:</span>
+                    <span class="metric-value" id="metricTokenPrompt">—</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">출력:</span>
+                    <span class="metric-value" id="metricTokenCompletion">—</span>
+                </div>
+            </div>
+
+            <!-- Top: Document Intelligence result -->
             <div class="json-panel">
                 <div class="panel-header">
-                    <span>📄 Content Understanding 결과</span>
+                    <span>📄 Document Intelligence 결과</span>
                     <span class="badge">Markdown</span>
                 </div>
                 <div class="tab-bar">
@@ -432,6 +509,7 @@
 
             renderJson('markdown');
             renderLlm(currentData.llm_analysis);
+            renderMetrics(currentData.metrics);
 
             document.getElementById('resultPanels').classList.add('visible');
         } catch (err) {
@@ -457,9 +535,9 @@
         let text = '';
 
         if (tab === 'markdown') {
-            text = currentData.content_understanding.markdown;
+            text = currentData.document_intelligence.markdown;
         } else if (tab === 'raw') {
-            text = JSON.stringify(currentData.content_understanding, null, 2);
+            text = JSON.stringify(currentData.document_intelligence, null, 2);
         }
 
         if (tab === 'raw') {
@@ -611,6 +689,31 @@
     function formatNumber(n) {
         if (n == null) return '-';
         return n.toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    // --- Metrics Rendering ---
+    function renderMetrics(metrics) {
+        if (!metrics) return;
+
+        document.getElementById('metricPageCount').textContent = metrics.di_page_count != null ? metrics.di_page_count + '페이지' : '—';
+        document.getElementById('metricDiTime').textContent = formatMs(metrics.di_response_time_ms);
+        document.getElementById('metricLlmTime').textContent = formatMs(metrics.llm_response_time_ms);
+
+        const usage = metrics.llm_token_usage || {};
+        document.getElementById('metricTokenTotal').textContent = formatTokens(usage.total_tokens);
+        document.getElementById('metricTokenPrompt').textContent = formatTokens(usage.prompt_tokens);
+        document.getElementById('metricTokenCompletion').textContent = formatTokens(usage.completion_tokens);
+    }
+
+    function formatMs(ms) {
+        if (ms == null) return '—';
+        if (ms < 1000) return ms + 'ms';
+        return (ms / 1000).toFixed(2) + 's';
+    }
+
+    function formatTokens(n) {
+        if (n == null) return '—';
+        return n.toLocaleString('ko-KR');
     }
 
     // --- Init ---

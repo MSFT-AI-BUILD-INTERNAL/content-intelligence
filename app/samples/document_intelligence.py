@@ -37,7 +37,7 @@ def main() -> None:
     combined = f"=== Layout ===\n{layout_text}\n\n=== OCR Content ===\n{ocr_text}"
     print("  Raw data extracted. Sending to LLM for structuring...")
 
-    doc_summary = extract_structured(
+    doc_summary, _ = extract_structured(
         combined,
         DocumentSummary,
         instruction=get_instruction("document_summary"),
@@ -50,7 +50,7 @@ def main() -> None:
     receipt_text = analyze_receipt(SAMPLE_FILE)
     print("  Raw receipt data extracted. Sending to LLM for structuring...")
 
-    receipt = extract_raw(
+    receipt, _ = extract_raw(
         receipt_text,
         instruction=get_instruction("receipt_extraction"),
     )

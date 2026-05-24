@@ -8,9 +8,11 @@ Authentication: Azure Managed Identity (DefaultAzureCredential).
 from __future__ import annotations
 
 import json
+import mimetypes
 from pathlib import Path
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentContentFormat
 
 from core.auth import get_credential
 from core.config import DOCUMENT_INTELLIGENCE_ENDPOINT
@@ -21,6 +23,30 @@ def _build_client() -> DocumentIntelligenceClient:
         endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
         credential=get_credential(),
     )
+
+
+def analyze_bytes(data: bytes, content_type: str) -> tuple[str, int]:
+    """Extract document content from raw bytes using prebuilt-layout. Returns (markdown, page_count)."""
+    import base64
+
+    client = _build_client()
+
+    base64_source = base64.b64encode(data).decode("utf-8")
+    poller = client.begin_analyze_document(
+        model_id="prebuilt-layout",
+        body=AnalyzeDocumentRequest(bytes_source=base64_source),
+        output_content_format=DocumentContentFormat.MARKDOWN,
+    )
+    result = poller.result()
+    page_count = len(result.pages) if result.pages else 0
+    return result.content, page_count
+
+
+def analyze(file_path: Path) -> tuple[str, int]:
+    """Extract document content from a local file. Returns (markdown, page_count)."""
+    guessed, _ = mimetypes.guess_type(file_path.name)
+    content_type = guessed or "application/pdf"
+    return analyze_bytes(file_path.read_bytes(), content_type)
 
 
 def analyze_layout(file_path: Path) -> str:

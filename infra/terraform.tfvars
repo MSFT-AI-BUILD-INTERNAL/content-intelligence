@@ -1,8 +1,0 @@
-project_name       = "content-intelligence"
-resource_group_name = "ai-build"
-
-# Azure AI service endpoints
-content_understanding_endpoint = "https://jinsungpark-westus-resource.services.ai.azure.com"
-azure_openai_endpoint          = "https://jinsang-foundry.services.ai.azure.com"
-llm_deployment                 = "gpt-5.2-chat"
-document_intelligence_endpoint = "https://jinsungpark-westus-resource.cognitiveservices.azure.com/"

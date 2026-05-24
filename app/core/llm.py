@@ -54,8 +54,8 @@ def extract_structured(
     raw_text: str,
     model_class: type[T],
     instruction: str = "Extract structured data from the following document content.",
-) -> T:
-    """Send raw extracted text to the LLM and return a validated Pydantic model."""
+) -> tuple[T, dict]:
+    """Send raw extracted text to the LLM and return a validated Pydantic model + usage dict."""
     client = _build_client()
 
     schema = _make_strict_schema(model_class.model_json_schema())
@@ -82,7 +82,8 @@ def extract_structured(
     )
 
     content = response.choices[0].message.content
-    return model_class.model_validate_json(content)
+    usage = _extract_usage(response)
+    return model_class.model_validate_json(content), usage
 
 
 def pretty_print(obj: BaseModel) -> str:
@@ -90,8 +91,8 @@ def pretty_print(obj: BaseModel) -> str:
     return json.dumps(obj.model_dump(exclude_none=True), indent=2, ensure_ascii=False)
 
 
-def extract_raw(raw_text: str, instruction: str) -> dict:
-    """Send raw text to the LLM and return a free-form JSON dict (no schema constraint)."""
+def extract_raw(raw_text: str, instruction: str) -> tuple[dict, dict]:
+    """Send raw text to the LLM and return a free-form JSON dict + usage dict."""
     client = _build_client()
 
     system_content = (
@@ -110,4 +111,16 @@ def extract_raw(raw_text: str, instruction: str) -> dict:
         response_format={"type": "json_object"},
     )
 
-    return json.loads(response.choices[0].message.content)
+    usage = _extract_usage(response)
+    return json.loads(response.choices[0].message.content), usage
+
+
+def _extract_usage(response) -> dict:
+    """Extract token usage from an OpenAI response object."""
+    if response.usage:
+        return {
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens,
+        }
+    return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}

@@ -3,7 +3,7 @@
 Azure AI Foundry — Content Understanding & Document Intelligence Sample
 
 Integrates both services using Azure Managed Identity (no API keys).
-Run: python main.py [content-understanding | document-intelligence | all]
+Run: python main.py [web | content-understanding | document-intelligence | all]
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ def _banner() -> None:
 
 def run_content_understanding() -> None:
     from samples.content_understanding import main as cu_main
+    print("[NOTE] content-understanding now uses Document Intelligence service")
     cu_main()
 
 
@@ -30,23 +31,31 @@ def run_document_intelligence() -> None:
     di_main()
 
 
+def run_web() -> None:
+    import uvicorn
+    print("Starting web server at http://0.0.0.0:8000 ...")
+    uvicorn.run("web.app:app", host="0.0.0.0", port=8000, reload=True)
+
+
 def main() -> None:
     _banner()
 
     commands = {
+        "web": run_web,
         "content-understanding": run_content_understanding,
         "document-intelligence": run_document_intelligence,
         "all": lambda: (run_content_understanding(), print(), run_document_intelligence()),
     }
 
-    choice = sys.argv[1] if len(sys.argv) > 1 else "all"
+    choice = sys.argv[1] if len(sys.argv) > 1 else "web"
 
     if choice in ("-h", "--help"):
-        print("Usage: python main.py [content-understanding | document-intelligence | all]")
+        print("Usage: python main.py [web | content-understanding | document-intelligence | all]")
         print()
+        print("  web                     Start the web application (default)")
         print("  content-understanding   Run Content Understanding samples only")
         print("  document-intelligence   Run Document Intelligence samples only")
-        print("  all                     Run both (default)")
+        print("  all                     Run both CLI samples")
         return
 
     runner = commands.get(choice)

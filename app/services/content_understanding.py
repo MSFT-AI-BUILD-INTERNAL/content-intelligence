@@ -7,6 +7,7 @@ Authentication: Azure Managed Identity (DefaultAzureCredential).
 
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 
 from azure.ai.contentunderstanding import ContentUnderstandingClient
@@ -27,20 +28,29 @@ def _build_client() -> ContentUnderstandingClient:
     )
 
 
-def analyze(file_path: Path) -> str:
-    """Extract document content with prebuilt-layout. Returns markdown."""
+def _extract_markdown(result: AnalysisResult) -> str:
+    """Extract and join markdown parts from an analysis result."""
+    parts: list[str] = []
+    for content in result.contents:
+        if isinstance(content, DocumentContent):
+            parts.append(content.markdown)
+    return "\n".join(parts)
+
+
+def analyze_bytes(data: bytes, content_type: str) -> str:
+    """Extract document content from raw bytes. Returns markdown."""
     client = _build_client()
 
     poller = client.begin_analyze_binary(
         analyzer_id="prebuilt-layout",
-        binary_input=file_path.read_bytes(),
-        content_type="application/pdf",
+        binary_input=data,
+        content_type=content_type,
     )
-    result: AnalysisResult = poller.result()
+    return _extract_markdown(poller.result())
 
-    markdown_parts: list[str] = []
-    for content in result.contents:
-        if isinstance(content, DocumentContent):
-            markdown_parts.append(content.markdown)
 
-    return "\n".join(markdown_parts)
+def analyze(file_path: Path) -> str:
+    """Extract document content from a local file. Returns markdown."""
+    guessed, _ = mimetypes.guess_type(file_path.name)
+    content_type = guessed or "application/pdf"
+    return analyze_bytes(file_path.read_bytes(), content_type)
