@@ -22,10 +22,16 @@ if command -v uv &>/dev/null; then
     echo "  -> Already installed: $(uv --version)"
 else
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
-    echo "  -> Done: $(uv --version)"
+    echo "  -> Done."
 fi
 export PATH="$HOME/.local/bin:$PATH"
+
+# Persist PATH for future shell sessions
+if ! grep -q '.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+    echo "  -> Added ~/.local/bin to ~/.bashrc"
+fi
+echo "  -> uv version: $(uv --version)"
 
 # --- 3. Python dependencies ---
 echo ""
